@@ -1,0 +1,148 @@
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    padding: 10px;
+    background: #0b1220;
+    color: #e6eef8;
+    width: 350px;
+    overflow: hidden;
+}
+.container { max-width: 100%; }
+.popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.popup-header h2 {
+    margin: 0;
+    font-size: 16px;
+    flex-shrink: 0; /* Prevent title from shrinking */
+}
+/* NEW: Styles for the countdown timer */
+#popup-countdown {
+    flex-grow: 1; /* Allow it to take available space */
+    text-align: center;
+    font-size: 13px;
+    color: #9aa6bd;
+    font-family: monospace;
+}
+#status-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+    min-height: 20px;
+}
+.status-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.02);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid transparent;
+}
+.status-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.status-item-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-grow: 1;
+    min-width: 0;
+    cursor: pointer;
+    gap: 8px;
+}
+.status-favicon {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+.title-wrapper {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+.status-item .status-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.status-item .status-text {
+    font-weight: bold;
+    color: #9aa6bd;
+    flex-shrink: 0;
+}
+.status-item.changed {
+    border-color: #32d583;
+}
+.status-item.changed .status-text {
+    color: #32d583;
+}
+.status-item.failed {
+    border-color: #ffb3b3;
+}
+.status-item.failed .status-text {
+    color: #ffb3b3;
+}
+.status-item-none {
+  color: #9aa6bd;
+  font-style: italic;
+  padding: 10px;
+  text-align: center;
+}
+.check-now-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    background-color: rgba(255, 255, 255, 0.03);
+    color: #9aa6bd;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.2s ease;
+}
+.check-now-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #e6eef8;
+}
+.check-now-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.popup-actions {
+    display: flex;
+    gap: 10px;
+}
+#selectElementBtn {
+    width: 42px;
+    flex-shrink: 0;
+    padding: 8px;
+    font-size: 20px;
+    font-weight: bold;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e6eef8;
+}
+#selectElementBtn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+#openDashboardBtn {
+    flex-grow: 1;
+    width: auto;
+    padding: 10px;
+    border-radius: 6px;
+    border: 0;
+    background: #32d583;
+    color: #012018;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+}
+#openDashboardBtn:hover {
+    opacity: 0.9;
+}

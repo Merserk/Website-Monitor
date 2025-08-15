@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Website Monitor</title>
+  <link rel="stylesheet" href="../styles/popup.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="popup-header">
+      <h2>Monitor Status</h2>
+      <span id="popup-countdown"></span>
+      <button id="checkAllBtnPopup" class="check-now-btn">Check all now</button>
+    </header>
+    <div id="status-list"></div>
+    <div class="popup-actions">
+      <button id="selectElementBtn" title="Select Element on This Page">+</button>
+      <button id="openDashboardBtn">Manage Monitors</button>
+    </div>
+  </main>
+  <!-- UPDATED: Include storage.js before popup.js -->
+  <script src="../js/storage.js"></script>
+  <script src="../js/popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf--8" />
+  <title>Monitor Dashboard</title>
+  <link rel="stylesheet" href="../styles/dashboard.css" />
+</head>
+<body>
+  <main class="container">
+    <h2>Website Monitor Dashboard</h2>
+
+    <section class="add-monitor">
+      <input id="url" placeholder="https://example.com/page" />
+      <div class="actions">
+        <button id="selectBtn">Select Element to Monitor</button>
+      </div>
+    </section>
+
+    <section class="global-controls">
+        <div class="global-controls-inputs">
+            <div>
+                <label for="globalInterval">Global Check Interval (minutes)</label>
+                <input id="globalInterval" type="number" min="1" value="60" />
+            </div>
+            <div>
+                <label for="maxConcurrency">Max concurrent checks</label>
+                <input id="maxConcurrency" type="number" min="1" value="1" />
+            </div>
+        </div>
+        <div class="global-controls-actions">
+            <button id="toggleAllBtn">Start All Monitoring</button>
+            <button id="checkAllBtn">Check all now</button>
+        </div>
+    </section>
+
+    <section class="import-export-controls">
+        <h3>Import / Export</h3>
+        <div class="actions">
+            <button id="importBtn">Import Monitors</button>
+            <button id="exportBtn">Export Monitors</button>
+            <input type="file" id="importFile" accept=".json" style="display: none;" />
+        </div>
+    </section>
+
+    <section class="list">
+      <div class="list-header">
+        <h3>Your Monitors</h3>
+        <span id="global-countdown" class="global-countdown-text"></span>
+      </div>
+      <div id="monitors"></div>
+    </section>
+  </main>
+
+  <script src="../js/storage.js"></script>
+  <script src="../js/export_import.js"></script>
+  <script src="../js/dashboard.js"></script>
+</body>
+</html>

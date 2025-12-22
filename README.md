@@ -2,8 +2,7 @@
 
 **Monitor web pages for changes and get notified when they update. A powerful, open-source alternative to commercial services.**
 
-<img width="1298" height="1095" alt="image" src="https://github.com/user-attachments/assets/609968c6-872a-4972-ac8d-6dc0fc1c50cc" />
-<img width="550" height="425" alt="image" src="https://github.com/user-attachments/assets/9f3698c8-2afe-4291-9d0a-1c4d5bebdf14" />
+<img width="1400" height="560" alt="Marquee Promo Tile 1400x560" src="https://github.com/user-attachments/assets/175e8aa2-73dc-427c-be82-59c3de792010" />
 
 Website Monitor is a browser extension that allows you to select any element on a webpage and track it for changes. Get notified when a price changes, a new article is published, or a stock status is updated. It's your personal web automation tool.
 

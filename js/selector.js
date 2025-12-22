@@ -1,76 +1,88 @@
-// selector.js - Injected into a page to allow visual element selection.
-
-(function() {
-    // Prevent the script from being injected multiple times
-    if (window.selectorScriptLoaded) {
-        return;
-    }
-    window.selectorScriptLoaded = true;
-
-    // --- UI ---
-    const banner = document.createElement('div');
-    banner.textContent = 'SELECTOR MODE: Move your mouse and click the element you want to monitor.';
-    Object.assign(banner.style, {
-        position: 'fixed',
-        top: '0',
-        left: '0',
-        width: '100%',
-        background: '#32d583',
-        color: '#012018',
-        textAlign: 'center',
-        padding: '10px',
-        zIndex: '99999999',
-        fontFamily: 'sans-serif',
-        fontSize: '16px',
-        fontWeight: 'bold',
-        boxSizing: 'border-box'
-    });
-    document.body.appendChild(banner);
-
-    let lastElement = null;
-
-    // --- Event Listeners ---
-    function handleMouseOver(e) {
-        const target = e.target;
-        if (target === banner) return;
-        if (lastElement) {
-            lastElement.style.outline = '';
+(function () {
+    // Expose the initialization function globally
+    window.initWebsiteMonitorSelector = function (monitorIdToEdit) {
+        // If already active, cleanup first to reset state (e.g. switching from Edit to Add)
+        if (window.websiteMonitorCleanup) {
+            window.websiteMonitorCleanup();
         }
-        target.style.outline = '2px solid #32d583';
-        lastElement = target;
-    }
 
-    function handleClick(e) {
-        e.preventDefault();
-        e.stopPropagation();
+        const isEditMode = (typeof monitorIdToEdit !== 'undefined' && monitorIdToEdit !== null);
 
-        const target = e.target;
-        if (target === banner) return;
-
-        const selector = generateRobustCssSelector(target);
-        const initialText = target.innerText;
-
-        cleanup();
-
-        // Send the selected data back to the extension
-        chrome.runtime.sendMessage({
-            type: 'elementSelected',
-            payload: {
-                selector: selector,
-                initialText: initialText,
-                url: window.location.href,
-                title: document.title
-            }
+        // --- UI ---
+        const banner = document.createElement('div');
+        banner.textContent = isEditMode
+            ? 'EDIT MODE: Select the new element for this monitor.'
+            : 'SELECTOR MODE: Move your mouse and click the element you want to monitor.';
+        Object.assign(banner.style, {
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            width: '100%',
+            background: isEditMode ? '#ffcd3c' : '#32d583', // Yellow for edit, Green for new
+            color: '#012018',
+            textAlign: 'center',
+            padding: '10px',
+            zIndex: '99999999',
+            fontFamily: 'sans-serif',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            boxSizing: 'border-box'
         });
-    }
+        document.body.appendChild(banner);
 
-    function cleanup() {
-        if (lastElement) lastElement.style.outline = '';
-        document.removeEventListener('mouseover', handleMouseOver);
-        document.removeEventListener('click', handleClick, true);
-        document.body.removeChild(banner);
-        window.selectorScriptLoaded = false;
-    }
+        let lastElement = null;
+
+        // --- Event Listeners ---
+        function handleMouseOver(e) {
+            const target = e.target;
+            if (target === banner) return;
+            if (lastElement) {
+                lastElement.style.outline = '';
+            }
+            target.style.outline = isEditMode ? '2px solid #ffcd3c' : '2px solid #32d583';
+            lastElement = target;
+        }
+
+        function handleClick(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const target = e.target;
+            if (target === banner) return;
+
+            const selector = generateRobustCssSelector(target);
+            const initialText = target.innerText;
+
+            cleanup();
+
+            // Send the selected data back to the extension
+            chrome.runtime.sendMessage({
+                type: 'elementSelected',
+                payload: {
+                    selector: selector,
+                    initialText: initialText,
+                    url: window.location.href,
+                    title: document.title,
+                    monitorId: monitorIdToEdit // Explicitly passed ID
+                }
+            });
+        }
+
+        function cleanup() {
+            if (lastElement) lastElement.style.outline = '';
+            document.removeEventListener('mouseover', handleMouseOver);
+            document.removeEventListener('click', handleClick, true);
+            if (banner.parentNode) banner.parentNode.removeChild(banner);
+            window.websiteMonitorCleanup = null;
+        }
+
+        // Expose cleanup for external reset
+        window.websiteMonitorCleanup = cleanup;
+
+        // Attach listeners
+        document.addEventListener('mouseover', handleMouseOver);
+        document.addEventListener('click', handleClick, true);
+    };
 
     // --- Smart Selector Generation Logic ---
     function generateRobustCssSelector(el) {
@@ -78,9 +90,7 @@
 
         // Regular expressions to identify unstable, auto-generated class names and IDs
         const unstableClassRegex = /^(css-|sc-|styled-|emotion-)/;
-        // Enhanced regex to detect common dynamic classes including focus states
         const dynamicClassRegex = /(-focused|-active|-hover|-selected|-current|-open|-closed|-visible|-hidden|_\d+$|\d{4,})/;
-        // Regex to detect common dynamic ID patterns
         const dynamicIdRegex = /^(ember\d+|\d+$|yui_)/;
 
         const path = [];
@@ -92,32 +102,31 @@
             if (id && !dynamicIdRegex.test(id)) {
                 selector += '#' + id;
                 path.unshift(selector);
-                break; // Stable ID is unique, no need to go further up
+                break;
             }
 
             // 2. Prioritize stable data-* attributes
             const testId = el.getAttribute('data-testid') || el.getAttribute('data-cy') || el.getAttribute('data-test');
             if (testId) {
-                 selector += `[data-testid="${testId.trim()}"]`;
-                 path.unshift(selector);
-                 break; // Assume test IDs are unique enough
+                selector += `[data-testid="${testId.trim()}"]`;
+                path.unshift(selector);
+                break;
             }
 
-            // 3. Use stable, semantic class names (exclude dynamic classes)
+            // 3. Use stable, semantic class names
             const allClasses = Array.from(el.classList);
-            const stableClasses = allClasses.filter(c => 
-                !unstableClassRegex.test(c) && 
-                !dynamicClassRegex.test(c) && 
+            const stableClasses = allClasses.filter(c =>
+                !unstableClassRegex.test(c) &&
+                !dynamicClassRegex.test(c) &&
                 c.length > 2 &&
-                // Keep core ProseMirror classes but exclude state-specific ones
-                (c === 'ProseMirror' || !c.includes('ProseMirror-') || 
-                 (c.includes('ProseMirror-') && !c.match(/-focused|-selected|-active|-current/)))
+                (c === 'ProseMirror' || !c.includes('ProseMirror-') ||
+                    (c.includes('ProseMirror-') && !c.match(/-focused|-selected|-active|-current/)))
             );
 
             if (stableClasses.length > 0) {
-                selector += '.' + stableClasses.slice(0, 3).join('.'); // Limit to first 3 stable classes
+                selector += '.' + stableClasses.slice(0, 3).join('.');
             } else {
-                // 4. Last resort: use structural position if no stable classes exist
+                // 4. Last resort: use structural position
                 let sib = el, nth = 1;
                 while (sib = sib.previousElementSibling) {
                     if (sib.nodeName.toLowerCase() === el.nodeName.toLowerCase()) {
@@ -132,41 +141,28 @@
             path.unshift(selector);
             el = el.parentNode;
         }
-        
-        // Optimize the selector path - remove redundant parent selectors if child is unique enough
+
         if (path.length > 3) {
-            const optimized = optimizeSelectorPath(path);
-            return optimized;
+            return optimizeSelectorPath(path);
         }
-        
+
         return path.join(" > ");
     }
 
-    // Helper function to optimize selector paths
     function optimizeSelectorPath(path) {
-        // Start with the full path
         let bestSelector = path.join(" > ");
-        
-        // Try shorter combinations starting from the end (most specific)
         for (let i = Math.max(0, path.length - 3); i < path.length; i++) {
             const candidate = path.slice(i).join(" > ");
             try {
-                // Test if this shorter selector still uniquely identifies the element
                 const elements = document.querySelectorAll(candidate);
                 if (elements.length === 1) {
                     bestSelector = candidate;
                     break;
                 }
             } catch (e) {
-                // Invalid selector, skip
                 continue;
             }
         }
-        
         return bestSelector;
     }
-
-    // Attach listeners
-    document.addEventListener('mouseover', handleMouseOver);
-    document.addEventListener('click', handleClick, true); // Use capture phase to intercept click
 })();

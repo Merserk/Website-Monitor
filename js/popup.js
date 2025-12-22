@@ -8,24 +8,46 @@ const popupCountdownEl = document.getElementById('popup-countdown');
 
 let localMonitors = [];
 let localSettings = {};
-let checkingMonitors = new Set(); // Track which monitors are currently being checked
+let monitorStatus = new Map(); // 'queued' | 'checking'
 
-function escapeHtml(s){ return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+function escapeHtml(s) { return s ? s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''; }
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'checkQueued') {
+    monitorStatus.set(msg.id, 'queued');
+    renderStatusList(localMonitors);
+  } else if (msg.type === 'checkStarted') {
+    monitorStatus.set(msg.id, 'checking');
+    renderStatusList(localMonitors);
+  } else if (msg.type === 'checkEnded') {
+    monitorStatus.delete(msg.id);
+    loadAndRender();
+  } else if (msg.type === 'queueCleared') {
+    for (const [id, status] of monitorStatus.entries()) {
+      if (status === 'queued') monitorStatus.delete(id);
+    }
+    renderStatusList(localMonitors);
+  }
+});
 
 function renderStatusList(list) {
   statusListEl.innerHTML = '';
-  if (list.length === 0) {
-    statusListEl.innerHTML = '<div class="status-item-none">No monitors configured.</div>';
+
+  // Filter out deleted monitors
+  const activeMonitors = list.filter(m => !m.deleted);
+
+  if (activeMonitors.length === 0) {
+    statusListEl.innerHTML = '<div class="status-item-none">No active monitors.</div>';
     return;
   }
 
   let itemsToRender;
-  const favorites = list.filter(m => m.isFavorite);
+  const favorites = activeMonitors.filter(m => m.isFavorite);
 
   if (favorites.length > 0) {
-      itemsToRender = favorites;
+    itemsToRender = favorites;
   } else {
-      itemsToRender = list;
+    itemsToRender = activeMonitors;
   }
 
   itemsToRender = itemsToRender.slice(0, 10);
@@ -33,18 +55,22 @@ function renderStatusList(list) {
   itemsToRender.forEach(m => {
     const el = document.createElement('div');
     el.className = 'status-item';
-    
+
+    if (monitorStatus.get(m.id) === 'checking') {
+      el.classList.add('checking');
+    }
+
     let statusText = 'no changes';
     if (m.lastCheckFailed) {
-        statusText = 'check failed';
-        el.classList.add('failed');
+      statusText = 'check failed';
+      el.classList.add('failed');
     } else if (m.changed) {
-        statusText = 'has changes!';
-        el.classList.add('changed');
+      statusText = 'has changes!';
+      el.classList.add('changed');
     }
 
     const title = m.title || m.url;
-    
+
     const contentDiv = document.createElement('div');
     contentDiv.className = 'status-item-content';
 
@@ -78,26 +104,32 @@ function renderStatusList(list) {
 
     const checkBtn = document.createElement('button');
     checkBtn.className = 'check-now-btn';
-    
-    // Check if this monitor is currently being checked
-    const isChecking = checkingMonitors.has(m.id);
-    checkBtn.textContent = isChecking ? 'Checking...' : 'Check now';
-    checkBtn.disabled = isChecking;
-    
+
+    const status = monitorStatus.get(m.id);
+    const isQueued = status === 'queued';
+    const isChecking = status === 'checking';
+
+    if (isChecking) checkBtn.textContent = 'Checking...';
+    else if (isQueued) checkBtn.textContent = 'Queued...';
+    else checkBtn.textContent = 'Check now';
+
+    checkBtn.disabled = isQueued || isChecking;
+
     checkBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      checkingMonitors.add(m.id);
-      chrome.runtime.sendMessage({ type: 'checkNow', id: m.id });
-      checkBtn.textContent = 'Checking...';
+      monitorStatus.set(m.id, 'queued');
+      checkBtn.textContent = 'Queued...';
       checkBtn.disabled = true;
-      
-      // Set a timeout to reset the button if no response comes back
+      chrome.runtime.sendMessage({ type: 'checkNow', id: m.id });
+
       setTimeout(() => {
-        checkingMonitors.delete(m.id);
-        if (!checkBtn.disabled) return; // Already reset
-        checkBtn.textContent = 'Check now';
-        checkBtn.disabled = false;
-      }, 30000); // 30 second timeout
+        if (monitorStatus.has(m.id)) {
+          monitorStatus.delete(m.id);
+          if (!checkBtn.disabled) return;
+          checkBtn.textContent = 'Check now';
+          checkBtn.disabled = false;
+        }
+      }, 30000);
     });
 
     el.append(contentDiv, checkBtn);
@@ -105,33 +137,45 @@ function renderStatusList(list) {
   });
 }
 
-function timeRemainingStr(nextTs){
+function timeRemainingStr(nextTs) {
   const ms = nextTs - Date.now();
-  if(ms <= 0) return 'now';
-  const totalSec = Math.floor(ms/1000);
-  const min = Math.floor(totalSec/60);
+  if (ms <= 0) return 'now';
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
   return (min > 0) ? `${min}m ${sec}s` : `${sec}s`;
 }
 
 function updatePopupCountdown() {
-    if (!localSettings.isRunning) {
-        popupCountdownEl.textContent = 'paused';
-        return;
+  if (!localSettings.isRunning) {
+    popupCountdownEl.textContent = 'paused';
+    return;
+  }
+  const runningMonitors = localMonitors.filter(m => m.running && m.nextCheckTime && !m.deleted);
+  if (runningMonitors.length === 0) {
+    popupCountdownEl.textContent = '';
+    return;
+  }
+  const soonestNextCheck = Math.min(...runningMonitors.map(m => m.nextCheckTime));
+  popupCountdownEl.textContent = timeRemainingStr(soonestNextCheck);
+}
+
+async function syncCheckStatus() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'getCheckStatus' });
+    if (response) {
+      response.queued.forEach(id => monitorStatus.set(id, 'queued'));
+      response.checking.forEach(id => monitorStatus.set(id, 'checking'));
+      renderStatusList(localMonitors);
     }
-    const runningMonitors = localMonitors.filter(m => m.running && m.nextCheckTime);
-    if (runningMonitors.length === 0) {
-        popupCountdownEl.textContent = '';
-        return;
-    }
-    const soonestNextCheck = Math.min(...runningMonitors.map(m => m.nextCheckTime));
-    popupCountdownEl.textContent = timeRemainingStr(soonestNextCheck);
+  } catch (e) { }
 }
 
 async function loadAndRender() {
   [localMonitors, localSettings] = await Promise.all([getMonitors(), getSettings()]);
   renderStatusList(localMonitors);
   updatePopupCountdown();
+  syncCheckStatus();
 }
 
 openDashboardBtn.addEventListener('click', () => {
@@ -142,58 +186,61 @@ openDashboardBtn.addEventListener('click', () => {
 });
 
 checkAllBtnPopup.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ type: 'checkAll' });
-    checkAllBtnPopup.textContent = 'Checking...';
-    checkAllBtnPopup.disabled = true;
-    
-    // Mark all monitors as being checked
-    localMonitors.forEach(m => checkingMonitors.add(m.id));
-    
-    // Re-render to update all individual check buttons
+  chrome.runtime.sendMessage({ type: 'checkAll' });
+  checkAllBtnPopup.textContent = 'Queuing...';
+  checkAllBtnPopup.disabled = true;
+
+  localMonitors.forEach(m => !m.deleted && monitorStatus.set(m.id, 'queued'));
+
+  renderStatusList(localMonitors);
+
+  setTimeout(() => {
+    checkAllBtnPopup.textContent = 'Check All';
+    checkAllBtnPopup.disabled = false;
+    monitorStatus.clear();
     renderStatusList(localMonitors);
-    
-    // Set a timeout to reset the button if no response comes back
-    setTimeout(() => {
-        checkAllBtnPopup.textContent = 'Check All';
-        checkAllBtnPopup.disabled = false;
-        checkingMonitors.clear();
-        renderStatusList(localMonitors);
-    }, 30000); // 30 second timeout
+  }, 30000);
 });
 
 selectElementBtn.addEventListener('click', async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab || !tab.url?.startsWith('http')) {
-        alert('You must be on a valid web page (http:// or https://) to select an element.');
-        return;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab || !tab.url?.startsWith('http')) {
+    alert('You must be on a valid web page (http:// or https://) to select an element.');
+    return;
+  }
+  await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ['js/selector.js']
+  });
+  await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: () => {
+      if (window.initWebsiteMonitorSelector) {
+        window.initWebsiteMonitorSelector(null); // NULL means Add Mode
+      }
     }
-    await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ['js/selector.js']
-    });
-    window.close();
+  });
+  window.close();
 });
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
-  // Reset checking status when monitors update (check completed)
-  if (namespace === 'sync' && changes.monitors_config) {
-    // Clear checking status for updated monitors
+  // NOW WATCHING 'local' FOR CONFIG
+  if (namespace === 'local' && changes.monitors_config) {
     if (changes.monitors_config.newValue) {
       const updatedMonitors = changes.monitors_config.newValue;
       updatedMonitors.forEach(m => {
-        if (checkingMonitors.has(m.id)) {
-          checkingMonitors.delete(m.id);
+        if (monitorStatus.has(m.id)) {
+          monitorStatus.delete(m.id);
         }
       });
     }
     loadAndRender();
   }
   if (namespace === 'local' && Object.keys(changes).some(key => key.startsWith('monitor_state_'))) {
-    // Clear checking status when state updates
     Object.keys(changes).forEach(key => {
       if (key.startsWith('monitor_state_')) {
         const monitorId = key.replace('monitor_state_', '');
-        checkingMonitors.delete(monitorId);
+        monitorStatus.delete(monitorId);
       }
     });
     loadAndRender();

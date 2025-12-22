@@ -18,6 +18,9 @@ Website Monitor is a browser extension that allows you to select any element on 
 *   **Import/Export:** You can export your monitors to a JSON file and import them back. This is useful for backing up your monitors or sharing them with others.
 *   **Distill.io Compatibility:** You can import your monitors from Distill.io.
 *   **Customizable:** You can set the check interval, and the maximum number of concurrent checks.
+*   **Total Checks Counter:** Track the total number of website checks performed over time.
+*   **Force Stop:** Instantly cancel all queued and running checks with a dedicated button.
+*   **Enhanced UI:** A modernized, wider dashboard layout with custom controls and synchronized status updates.
 *   **Favorites:** You can mark your favorite monitors to be displayed in the popup.
 
 ---
